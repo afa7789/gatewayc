@@ -3,6 +3,7 @@ package client
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 
@@ -66,27 +67,39 @@ func (c *Client) Serve() {
 		}
 
 		var fromBlock int64
-		if valueBlock == "" {
-			// if there is no block in the db, start from the initial block
+
+		// Check if valueBlock is empty or nil
+		if valueBlock == "" || len(valueBlock) == 0 {
+			// If there is no block in the db, start from the initial block
 			fromBlock = c.initialBlock
+			log.Printf("No last block found in DB. Starting from the initial block: %d", fromBlock)
 		} else {
+			// Try to parse the block value if it exists
 			fromBlock, err = strconv.ParseInt(valueBlock, 10, 64)
 			if err != nil {
-				log.Fatalf("Failed to convert initialBlock to int64: %v", err)
+				log.Fatalf("Failed to convert last block to int64: valueBlock=%v, error: %v", valueBlock, err)
 			}
 		}
 
-		// GET LAST BLOCK INDEX FROM BOLTDB
-		err, valueIndex := c.db.ReadFromDB("contract_handling", "last_index")
+		// GET LAST INDEX FROM BOLTDB
+		err, valueIndex := c.db.ReadFromDB("contract_handling", "next_index")
 		if err != nil {
-			log.Fatalf("Failed to read LAST BLOCK from BoltDB: %v", err)
+			log.Fatalf("Failed to read LAST INDEX from BoltDB: %v", err)
 		}
-		previousIndex, err := strconv.ParseInt(valueIndex, 10, 64)
-		if err != nil {
-			log.Fatalf("Failed to convert initialBlock to int64: %v", err)
-		} else if valueIndex == "" {
-			// if there is no block in the db, start from the initial block
+
+		var previousIndex int64
+
+		// Check if valueIndex is empty or nil before parsing
+		if valueIndex == "" || len(valueIndex) == 0 {
+			// If there is no index in the db, start from the initial index (0)
 			previousIndex = 0
+			log.Printf("No last index found in DB. Starting from index: %d", previousIndex)
+		} else {
+			// If valueIndex is not empty, attempt to parse it
+			previousIndex, err = strconv.ParseInt(valueIndex, 10, 64)
+			if err != nil {
+				log.Fatalf("Failed to convert next_index to int64: valueIndex=%v, error: %v", valueIndex, err)
+			}
 		}
 
 		toBlock := fromBlock + c.blockStep
@@ -108,7 +121,7 @@ func (c *Client) Serve() {
 			}
 
 			// store at BoltDB
-			if err := c.db.WriteToDB("keyed_logs", string(int64(i)+previousIndex), string(keyedJson)); err != nil {
+			if err := c.db.WriteToDB("keyed_logs", string(int64(i)+previousIndex+1), string(keyedJson)); err != nil {
 				// Must come up with a better way to handle error here...
 				// probably also need a retry logic
 				log.Fatalf("Failed to write keyed log to BoltDB: %v", err)
@@ -117,13 +130,17 @@ func (c *Client) Serve() {
 
 		// save references, for next interval
 		// these values must be saved on the DB, in case the application crash and you must run it again.
-		previousIndex += int64(len(keyed) + 1)
-		if err := c.db.WriteToDB("contract_handling", "last_index", string(previousIndex)); err != nil {
+		if len(keyed) != 0 {
+			previousIndex += int64(len(keyed))
+			if err := c.db.WriteToDB("contract_handling", "next_index", fmt.Sprintf("%d", previousIndex)); err != nil {
+				log.Fatalf("Failed to write last block to BoltDB: %v", err)
+			}
+		}
+		if err := c.db.WriteToDB("contract_handling", "last_block", fmt.Sprintf("%d", toBlock)); err != nil {
 			log.Fatalf("Failed to write last block to BoltDB: %v", err)
 		}
-		if err := c.db.WriteToDB("contract_handling", "last_block", string(toBlock)); err != nil {
-			log.Fatalf("Failed to write last block to BoltDB: %v", err)
-		}
+		log.Printf("Saved last block: %d", toBlock)
+		log.Printf("Last Index: %d", previousIndex)
 		// END interval
 	}
 
@@ -131,7 +148,7 @@ func (c *Client) Serve() {
 
 // This would be a way to retrieve the values at the db.
 func (c *Client) LogKeyedInserts() {
-	err, valueIndex := c.db.ReadFromDB("contract_handling", "last_index")
+	err, valueIndex := c.db.ReadFromDB("contract_handling", "next_index")
 	if err != nil {
 		log.Fatalf("Failed to read LAST BLOCK from BoltDB: %v", err)
 	}
