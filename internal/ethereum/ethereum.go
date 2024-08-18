@@ -79,15 +79,18 @@ func (ec *EthereumClient) FetchLogs(from, to int64) error {
 	// Process and print logs
 	for _, vLog := range logs {
 
-		fmt.Printf("Log Block Number: %d\n", vLog.BlockNumber)
-		fmt.Printf("Log Index: %d\n", vLog.Index)
-		fmt.Printf("Log Address: %s\n", vLog.Address.Hex())
-		fmt.Printf("Log Data: %s\n", common.Bytes2Hex(vLog.Data)) // Use Bytes2Hex here
-		fmt.Printf("Log Topics: %v\n", vLog.Topics)
+		log.Printf(
+			"\tLog Block Number: %d\n\tLog Index: %d\n\tLog Address: %s\n\tLog Data: %s\n\tLog Topics: %v\n",
+			vLog.BlockNumber,
+			vLog.Index,
+			vLog.Address.Hex(),
+			common.Bytes2Hex(vLog.Data),
+			vLog.Topics,
+		)
 
-		for _, topic := range vLog.Topics {
+		for i, topic := range vLog.Topics {
 			if topic.Hex() == ec.topicToFilter {
-				fmt.Println("Matched topic!")
+				log.Println("Matched topic at", i, "!")
 			}
 		}
 

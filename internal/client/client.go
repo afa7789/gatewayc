@@ -50,8 +50,8 @@ func (c *Client) Serve() {
 	log.Printf("Successfully read '%s' from the key 'hello_world'.", value)
 
 	c.eth.FetchLogs(
-		6525866,
-		6525867,
+		6525865,
+		6525979,
 	)
 }
 

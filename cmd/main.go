@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -48,7 +47,10 @@ func main() {
 	nodeUrl := nodeList[0]
 
 	// Print Hello World and the ROCK_DB_HOST_PATH
-	fmt.Printf("BOLT_DB_PATH: %s\n", boltDBpath)
+	log.Printf("BOLT_DB_PATH: %s\n", boltDBpath)
+	log.Printf("CONTRACT_ADDRESS: %s\n", contractAddress)
+	log.Printf("TOPIC_TO_FILTER: %s\n", topicToFilter)
+	log.Printf("NODE_URL: %s\n", nodeUrl)
 
 	// Create a new client
 	c := client.NewClient(
