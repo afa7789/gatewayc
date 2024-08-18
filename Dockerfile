@@ -11,7 +11,10 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy your Go application into the Docker image
+
+# Copy the Go module files
 COPY . .
+
 RUN go mod download
 
 # Install Go modules if needed

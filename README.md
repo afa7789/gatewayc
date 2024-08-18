@@ -26,9 +26,7 @@ sudo apt update
 sudo apt install make
 ```
 
-rocksdb, you have to follow install from here, if not using docker: https://github.com/facebook/rocksdb
-
-if you have have docker, just do the docker running option.
+you willl need docker to execute everything
 
 ## EXECUTING
 
@@ -36,15 +34,9 @@ if you have have docker, just do the docker running option.
 with docker ( so you don't have to install anything ):
 
 `make docker`
-
-### RUNNING IT
 `make run`
 
-### BINARY
-#### build binary
+if the docker is already built and you have no code changes, just use:
 
-`make bin`
-
-#### run binary
-
-`make serve`
+`make rund`
+`make run`
