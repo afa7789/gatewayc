@@ -2,51 +2,80 @@
 
 # Indexer
 
-just a simple implementation of a indexer, that will index the topic X of contract Y in chain sepolia
+To see screenshots of how it works, just scroll down the README.md.
 
-`for second challenge check branch "second"`
+This is a simple implementation of an indexer that indexes topic X of contract Y on the Sepolia chain.
 
-## Pre-Requisites && Installing
+For the second challenge, check the branch "second".
 
-GO LANG version: `go1.22.1'`
+## Pre-Requisites & Installation
 
-GNU Make
+- Go (Version: `go1.22.1`)
+- GNU Make
 
-```SH
-#MAC OS
+### Installing GNU Make:
+
+For macOS:
+
+```bash
 brew install make
+```
 
-# REDHAT FEDORA CENTOS
+For Red Hat, Fedora, or CentOS:
+
+```bash
 sudo dnf install make
-# or for older versions
+# Or for older versions:
 sudo yum install make
+```
 
-#DEBIAN
+For Debian-based systems:
+
+```bash
 sudo apt update
 sudo apt install make
 ```
 
-you willl need docker to execute everything
+You will need Docker to execute everything.
 
-## EXECUTING
+## Execution
 
-### DOCKER
-with docker ( so you don't have to install anything ):
+### Using Docker
 
-`make docker`
-`make run`
+To run with Docker (so you don't need to install dependencies manually):
 
-if the docker is already built and you have no code changes, just use:
-![alt text](image.png)
-`make rund`
-`make run`
+```bash
+make docker
+make run
+```
 
-# Example of code being Run
+If Docker is already built and there are no code changes, simply run:
 
-Just a screenshot of the code running from the scracth
+```bash
+make rund
+make run
+```
+
+To stop the running code and check if anything has been written to the database, execute:
+
+```bash
+go run cmd/read.go
+```
+
+To see screenshots of how it works, just scroll down the README.md.
+
+## Example of Code Execution
+
+### Running the Go Binary:
+
+Here’s a screenshot of the code running from scratch:
 
 ![Example Image](resources/image.png)
 
-# Comments
+### Reading the Data:
 
-If code fails it's going to crash on fatal, so next steps would be to remove fatal, add retry mechanism and other things such as this to make sure the code can be left turned on. I'm considering it to be out of scope. So I'm not doing it.
+![READING DATA](resources/READING.png)
+
+## Comments
+
+If the code fails, it will crash with a fatal error. Future improvements could include removing the fatal error handling and adding retry mechanisms, among other enhancements, to ensure the code can run continuously. However, this is currently out of scope and will not be implemented.
