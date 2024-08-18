@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"os"
 	"strings"
 
 	"github.com/ethereum/go-ethereum"
@@ -13,55 +14,96 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// Replace with your contract address and ABI
-const contractAddress = "0xYourContractAddressHere"
-const contractABI = `[{"anonymous":false,"inputs":[{"indexed":true,"name":"value","type":"uint256"}],"name":"ValueChanged","type":"event"}]`
+// EthereumClient wraps the functionality to interact with an Ethereum contract
+type EthereumClient struct {
+	client          *ethclient.Client
+	contractABI     *abi.ABI
+	contractAddress common.Address
+	topicToFilter   string
+}
 
-func main() {
+// NewEthereumClient creates a new EthereumClient instance
+func NewEthereumClient(
+	providerURL,
+	contractAddress,
+	contractABIPath string,
+	topicToFilter string,
+) (*EthereumClient, error) {
 	// Connect to the Ethereum client
-	client, err := ethclient.Dial("https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID")
+	client, err := ethclient.Dial(providerURL)
 	if err != nil {
-		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
+		return nil, fmt.Errorf("failed to connect to the Ethereum client: %w", err)
 	}
 
 	// Parse the ABI
-	parsedABI, err := abi.JSON(strings.NewReader(contractABI))
+	abiFileContent, err := os.ReadFile(contractABIPath)
 	if err != nil {
-		log.Fatalf("Failed to parse contract ABI: %v", err)
+		return nil, fmt.Errorf("failed to read contract ABI file: %w", err)
+	}
+
+	parsedABI, err := abi.JSON(strings.NewReader(string(abiFileContent)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse contract ABI: %w", err)
 	}
 
 	// Define the contract address
 	contractAddr := common.HexToAddress(contractAddress)
 
+	return &EthereumClient{
+		client:          client,
+		contractABI:     &parsedABI,
+		contractAddress: contractAddr,
+		topicToFilter:   topicToFilter,
+	}, nil
+}
+
+// FetchLogs retrieves and processes logs from the contract
+func (ec *EthereumClient) FetchLogs(from, to int64) error {
+	log.Println("Fetching logs...")
 	// Create a filter query
 	query := ethereum.FilterQuery{
-		Addresses: []common.Address{contractAddr},
+		Addresses: []common.Address{ec.contractAddress},
 		Topics:    [][]common.Hash{},
+		FromBlock: big.NewInt(from),
+		ToBlock:   big.NewInt(to),
 	}
 
 	// Fetch logs
-	logs, err := client.FilterLogs(context.Background(), query)
+	logs, err := ec.client.FilterLogs(context.Background(), query)
 	if err != nil {
-		log.Fatalf("Failed to retrieve logs: %v", err)
+		return fmt.Errorf("failed to retrieve logs: %w", err)
 	}
+
+	log.Printf("Fetched %d logs\n", len(logs))
 
 	// Process and print logs
 	for _, vLog := range logs {
+
 		fmt.Printf("Log Block Number: %d\n", vLog.BlockNumber)
 		fmt.Printf("Log Index: %d\n", vLog.Index)
 		fmt.Printf("Log Address: %s\n", vLog.Address.Hex())
-		fmt.Printf("Log Data: %s\n", vLog.Data.Hex())
+		fmt.Printf("Log Data: %s\n", common.Bytes2Hex(vLog.Data)) // Use Bytes2Hex here
 		fmt.Printf("Log Topics: %v\n", vLog.Topics)
+
+		for _, topic := range vLog.Topics {
+			if topic.Hex() == ec.topicToFilter {
+				fmt.Println("Matched topic!")
+			}
+		}
 
 		// Decode log data if needed
 		event := struct {
 			Value *big.Int
 		}{}
-		err := parsedABI.UnpackIntoInterface(&event, "ValueChanged", vLog.Data)
+		err := ec.contractABI.UnpackIntoInterface(&event, "ValueChanged", vLog.Data)
 		if err != nil {
 			log.Printf("Failed to unpack log data: %v", err)
 		} else {
 			fmt.Printf("Event Value: %s\n", event.Value.String())
 		}
 	}
+
+	log.Println("End of fetching logs...")
+
+	return nil
 }

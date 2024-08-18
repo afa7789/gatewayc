@@ -5,20 +5,36 @@ import (
 	"log"
 
 	"github.com/afa7789/gatewayc/internal/boltdb"
+	"github.com/afa7789/gatewayc/internal/ethereum"
 )
 
 // Client is a struct that will interact with RocksDB
 type Client struct {
-	db *boltdb.BoltDBWrapper
+	db  *boltdb.BoltDBWrapper
+	eth *ethereum.EthereumClient
 }
 
 // NewClient initializes a new client with RocksDB
 func NewClient(
 	dbPath string,
-	nodesList []string,
+	nodeUrl string,
+	contractAddress string,
+	topicToFilter string,
+
 ) *Client {
+
 	db := boltdb.NewBoltDB(dbPath)
-	return &Client{db: db}
+	eth, err := ethereum.NewEthereumClient(
+		nodeUrl,
+		contractAddress,
+		"contract/contractabi.json",
+		topicToFilter,
+	)
+	if err != nil {
+		log.Fatalf("Failed to create Ethereum client: %v", err)
+	}
+
+	return &Client{db: db, eth: eth}
 }
 
 func (c *Client) Serve() {
@@ -32,6 +48,11 @@ func (c *Client) Serve() {
 		log.Fatalf("Failed to read from RocksDB: %v", err)
 	}
 	log.Printf("Successfully read '%s' from the key 'hello_world'.", value)
+
+	c.eth.FetchLogs(
+		6525866,
+		6525867,
+	)
 }
 
 // Close closes the RocksDB connection
