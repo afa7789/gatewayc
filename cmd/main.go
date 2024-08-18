@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/afa7789/gatewayc/internal/client"
@@ -33,6 +34,11 @@ func main() {
 		log.Fatal("TOPIC_TO_FILTER is not set in the environment")
 	}
 
+	initialBlock := os.Getenv("INITIAL_BLOCK")
+	if initialBlock == "" {
+		log.Fatal("INITIAL_BLOCK is not set in the environment")
+	}
+
 	// read first line from file in nodeList
 	// to get a node provider RPC url
 	nodeListPath := os.Getenv("NODES_LIST")
@@ -51,13 +57,19 @@ func main() {
 	log.Printf("CONTRACT_ADDRESS: %s\n", contractAddress)
 	log.Printf("TOPIC_TO_FILTER: %s\n", topicToFilter)
 	log.Printf("NODE_URL: %s\n", nodeUrl)
-
+	//
 	// Create a new client
+	initialBlockInt, err := strconv.ParseInt(initialBlock, 10, 64)
+	if err != nil {
+		log.Fatalf("Failed to convert initialBlock to int64: %v", err)
+	}
+
 	c := client.NewClient(
 		boltDBpath,
 		nodeUrl,
 		contractAddress,
 		topicToFilter,
+		initialBlockInt,
 	)
 	defer c.Close()
 

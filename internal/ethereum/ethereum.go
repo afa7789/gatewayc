@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/afa7789/gatewayc/internal/domain"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -76,6 +77,8 @@ func (ec *EthereumClient) FetchLogs(from, to int64) error {
 
 	log.Printf("Fetched %d logs\n", len(logs))
 
+	// counter := 0
+
 	// Process and print logs
 	for _, vLog := range logs {
 
@@ -109,4 +112,51 @@ func (ec *EthereumClient) FetchLogs(from, to int64) error {
 	log.Println("End of fetching logs...")
 
 	return nil
+}
+
+// Create domain.KeyedLog instances from the logs
+func (ec *EthereumClient) KeyedLogs(from, to int64) ([]domain.KeyedLog, error) {
+
+	// Create a filter query
+	query := ethereum.FilterQuery{
+		Addresses: []common.Address{ec.contractAddress},
+		Topics:    [][]common.Hash{},
+		FromBlock: big.NewInt(from),
+		ToBlock:   big.NewInt(to),
+	}
+
+	// Fetch logs
+	logs, err := ec.client.FilterLogs(context.Background(), query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve logs: %w", err)
+	}
+
+	keyedLogs := make([]domain.KeyedLog, 0, len(logs))
+
+	for _, log := range logs {
+
+		block, err := ec.client.BlockByHash(context.Background(), log.BlockHash)
+		if err != nil {
+			// log.Printf("Failed to fetch block data: %v", err)
+			return nil, err
+		}
+
+		blockTime := block.Time()
+		parentHash := block.ParentHash().Hex()
+
+		for _, topic := range log.Topics {
+			if topic.Hex() == ec.topicToFilter {
+
+				keyedLog := domain.KeyedLog{
+					RootData:   common.Bytes2Hex(log.Data),
+					ParentHash: parentHash,
+					BlockTime:  blockTime,
+				}
+
+				keyedLogs = append(keyedLogs, keyedLog)
+			}
+		}
+	}
+
+	return keyedLogs, nil
 }
