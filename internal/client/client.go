@@ -146,6 +146,7 @@ func (c *Client) Serve() {
 	}
 
 }
+
 func (c *Client) LogKeyedInserts() {
 	// GET LAST INDEX FROM BOLTDB
 	err, valueIndex := c.db.ReadFromDB("contract_handling", "next_index")
