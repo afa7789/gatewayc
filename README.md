@@ -26,6 +26,8 @@ sudo apt update
 sudo apt install make
 ```
 
+rocksdb, you have to follow install from here, if not using docker: https://github.com/facebook/rocksdb
+
 if you have have docker, just do the docker running option.
 
 ## EXECUTING

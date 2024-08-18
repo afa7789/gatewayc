@@ -1,31 +1,21 @@
-# First stage: Build the Go binary
-FROM golang:1.22 AS builder
+# Use the Golang image as the base image
+FROM golang:1.22
 
-# Set the working directory inside the builder container
+# Install necessary build dependencies (if needed)
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
+    git
+
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy the Go module files and download dependencies
-COPY go.mod go.sum ./
+# Copy your Go application into the Docker image
+COPY . .
 RUN go mod download
 
-# Copy the source code (assuming your main.go is in cmd/)
-COPY ./cmd ./cmd
+# Install Go modules if needed
+RUN go get github.com/boltdb/bolt/...
 
-# Build the Go binary
-RUN go build -o /app/main ./cmd/main.go
-
-# Second stage: Create a smaller final image
-FROM debian:bullseye-slim
-
-# Set the working directory inside the final image
-WORKDIR /app
-
-# Copy the binary from the builder stage
-COPY --from=builder /app/main .
-
-# Expose any ports (if needed), for example:
-# EXPOSE 8080
-
-# Command to run the binary
-CMD ["./main"]
-
+# Set the default command to run a shell
+CMD ["/bin/bash"]
