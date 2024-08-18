@@ -39,6 +39,11 @@ func main() {
 		log.Fatal("INITIAL_BLOCK is not set in the environment")
 	}
 
+	blockStep := os.Getenv("BLOCK_STEP")
+	if initialBlock == "" {
+		log.Fatal("BLOCK_STEP is not set in the environment")
+	}
+
 	// read first line from file in nodeList
 	// to get a node provider RPC url
 	nodeListPath := os.Getenv("NODES_LIST")
@@ -61,7 +66,13 @@ func main() {
 	// Create a new client
 	initialBlockInt, err := strconv.ParseInt(initialBlock, 10, 64)
 	if err != nil {
-		log.Fatalf("Failed to convert initialBlock to int64: %v", err)
+		log.Println("UE ", initialBlock, " UE")
+		log.Fatalf("Failed to convert initialBlock to int64 main: %v", err)
+	}
+
+	blockStepInt, err := strconv.ParseInt(blockStep, 10, 64)
+	if err != nil {
+		log.Fatalf("Failed to convert blockStep to int64 main: %v", err)
 	}
 
 	c := client.NewClient(
@@ -70,6 +81,7 @@ func main() {
 		contractAddress,
 		topicToFilter,
 		initialBlockInt,
+		blockStepInt,
 	)
 	defer c.Close()
 
