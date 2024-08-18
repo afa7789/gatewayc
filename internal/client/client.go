@@ -41,6 +41,8 @@ func NewClient(
 }
 
 func (c *Client) Serve() {
+
+	// testing the db
 	err := c.db.WriteToDB("bucket", "hello_world", "Hello World!")
 	if err != nil {
 		log.Fatalf("Failed to write 'Hello World!' to BoltDB: %v", err)
@@ -53,7 +55,6 @@ func (c *Client) Serve() {
 	log.Printf("Successfully read '%s' from the key 'hello_world'.", value)
 
 	// PUT THIS IN AN INTERVAL
-
 	// GET LAST BLOCK FROM BOLTDB
 	err, valueBlock := c.db.ReadFromDB("contract_handling", "last_block")
 	if err != nil {
@@ -115,6 +116,7 @@ func (c *Client) Serve() {
 	if err := c.db.WriteToDB("contract_handling", "last_block", string(toBlock)); err != nil {
 		log.Fatalf("Failed to write last block to BoltDB: %v", err)
 	}
+	// END interval
 
 }
 
