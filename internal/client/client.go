@@ -120,8 +120,11 @@ func (c *Client) Serve() {
 				log.Fatalf("Error marshalling struct to JSON: %v", err)
 			}
 
+			// Convert index to string
+			indexKey := strconv.FormatInt(int64(i)+previousIndex+1, 10)
+
 			// store at BoltDB
-			if err := c.db.WriteToDB("keyed_logs", string(int64(i)+previousIndex+1), string(keyedJson)); err != nil {
+			if err := c.db.WriteToDB("keyed_logs", indexKey, string(keyedJson)); err != nil {
 				// Must come up with a better way to handle error here...
 				// probably also need a retry logic
 				log.Fatalf("Failed to write keyed log to BoltDB: %v", err)
@@ -130,11 +133,9 @@ func (c *Client) Serve() {
 
 		// save references, for next interval
 		// these values must be saved on the DB, in case the application crash and you must run it again.
-		if len(keyed) != 0 {
-			previousIndex += int64(len(keyed))
-			if err := c.db.WriteToDB("contract_handling", "next_index", fmt.Sprintf("%d", previousIndex)); err != nil {
-				log.Fatalf("Failed to write last block to BoltDB: %v", err)
-			}
+		previousIndex += int64(len(keyed))
+		if err := c.db.WriteToDB("contract_handling", "next_index", fmt.Sprintf("%d", previousIndex)); err != nil {
+			log.Fatalf("Failed to write last block to BoltDB: %v", err)
 		}
 		if err := c.db.WriteToDB("contract_handling", "last_block", fmt.Sprintf("%d", toBlock)); err != nil {
 			log.Fatalf("Failed to write last block to BoltDB: %v", err)
@@ -145,49 +146,51 @@ func (c *Client) Serve() {
 	}
 
 }
-
-// This would be a way to retrieve the values at the db.
 func (c *Client) LogKeyedInserts() {
+	// GET LAST INDEX FROM BOLTDB
 	err, valueIndex := c.db.ReadFromDB("contract_handling", "next_index")
 	if err != nil {
-		log.Fatalf("Failed to read LAST BLOCK from BoltDB: %v", err)
+		log.Fatalf("Failed to read NEXT INDEX from BoltDB: %v", err)
 	}
 
 	if valueIndex == "" {
-		// if there is no index in db
-		// nothing to show
+		// No index in the database, nothing to show
 		return
 	}
 
 	lastIndex, err := strconv.ParseInt(valueIndex, 10, 64)
 	if err != nil {
-		log.Fatalf("Failed to convert initialBlock to int64: %v", err)
+		log.Fatalf("Failed to convert NEXT INDEX to int64: %v", err)
 	}
 
 	for i := int64(0); i < lastIndex; i++ {
-		err, value := c.db.ReadFromDB(
-			"keyed_logs",
-			strconv.FormatInt(i, 10),
-		)
+		// Retrieve the value for the current index
+		err, value := c.db.ReadFromDB("keyed_logs", strconv.FormatInt(i, 10))
 		if err != nil {
 			log.Fatalf("Failed to read from BoltDB: %v", err)
 		}
 
-		// string to bytes
+		// Check if the value is empty
+		if value == "" {
+			log.Printf("Index:%d, WARNING: Empty value in DB.", i)
+			continue
+		}
+
+		// Unmarshal the JSON into the struct
 		var keyedLog domain.KeyedLog
 		err = json.Unmarshal([]byte(value), &keyedLog)
 		if err != nil {
-			log.Fatalf("Failed to unmarshal JSON: %v", err)
+			log.Printf("Index:%d, ERROR Failed to unmarshal JSON: %v", i, err)
+		} else {
+			log.Printf(
+				"\tIndex: %d,\n\tRootData: %s,\n\tParentHash: %s,\n\tBlockTime: %d",
+				i,
+				keyedLog.RootData,
+				keyedLog.ParentHash,
+				keyedLog.BlockTime,
+			)
 		}
-		log.Printf(
-			"\tIndex: %d,\n\tRootData: %s,\n\tParentHash: %s,\n\tBlockTime: %d",
-			i,
-			keyedLog.RootData,
-			keyedLog.ParentHash,
-			keyedLog.BlockTime,
-		)
 	}
-
 }
 
 // Close closes the BoltDB connection

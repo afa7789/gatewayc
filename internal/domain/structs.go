@@ -3,9 +3,9 @@ package domain
 import "github.com/ethereum/go-ethereum/common"
 
 type KeyedLog struct {
-	RootData   string
-	ParentHash string
-	BlockTime  uint64
+	RootData   string `json:"rootData"`
+	ParentHash string `json:"parentHash"`
+	BlockTime  uint64 `json:"blockTime"`
 }
 
 // this is how I imagine we would use the root data
