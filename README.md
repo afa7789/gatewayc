@@ -70,6 +70,7 @@ To see screenshots of how it works, just scroll down the README.md.
 
 ### Running the Go Binary:
 
+
 Here’s a screenshot of the code running from scratch:
 
 ![Example Image](resources/image.png)
@@ -77,6 +78,11 @@ Here’s a screenshot of the code running from scratch:
 ### Reading the Data:
 
 ![READING DATA](resources/READING.png)
+
+Screenshot of the code running on challenge 2, with 2 urls, using a mask to not show full url, due to posting this image on the internet.
+
+![Example Image](resources/image_second.png)
+
 
 ## Comments
 

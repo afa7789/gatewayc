@@ -58,10 +58,10 @@ func NewClient(
 }
 
 func (c *Client) Serve() {
-	// Create a channel to manage work signals or steps
-	stepChannel := make(chan int64, len(c.ethClients))
+	// Channel to send block ranges to workers
+	blockRangeChannel := make(chan struct{ from, to int64 })
 
-	// Initialize the starting block and step
+	// Initialize the starting block
 	var initialBlock int64
 
 	// Read the last block from BoltDB
@@ -79,80 +79,61 @@ func (c *Client) Serve() {
 		}
 	}
 
-	// Start workers for each Ethereum client
+	// Create workers
 	for nodeUrl, ethClient := range c.ethClients {
 		go func(nodeUrl string, ethClient *ethereum.EthereumClient) {
-			for {
-				// Send the current initial block and block step to the channel
-				stepChannel <- initialBlock
-
-				// Process blocks for this client
-				c.processClient(nodeUrl, ethClient, stepChannel)
-			}
+			c.processClient(nodeUrl, ethClient, blockRangeChannel)
 		}(nodeUrl, ethClient)
 	}
 
-	// Optional: handle or log the results from the channel (if needed)
-	for range stepChannel {
-		// This loop can be used for logging or other operations if necessary
-		log.Println("A worker has processed a step.")
-	}
+	// Distribute block ranges
+	go func() {
+		for {
+			toBlock := initialBlock + c.blockStep
+			blockRangeChannel <- struct{ from, to int64 }{from: initialBlock, to: toBlock}
+			initialBlock = toBlock
+			time.Sleep(5 * time.Second) // Adjust this as needed to control the distribution frequency
+		}
+	}()
+
+	// Keep the Serve function running
+	select {} // This will block indefinitely to keep the Serve function alive
 }
 
-func (c *Client) processClient(nodeUrl string, ethClient *ethereum.EthereumClient, stepChannel <-chan int64) {
-	for {
-		// Wait for a signal from the step channel to start processing
-		fromBlock := <-stepChannel
+func (c *Client) processClient(nodeUrl string, ethClient *ethereum.EthereumClient, blockRangeChannel <-chan struct{ from, to int64 }) {
+	for blockRange := range blockRangeChannel {
+		fromBlock, toBlock := blockRange.from, blockRange.to
 
-		// Unique keys for each client in the database
-		lastBlockKey := "last_block"
-		nextIndexKey := "next_index"
-
-		// Lock the critical section where we read and update the database
-		c.mutex.Lock()
-
-		// Read last block from BoltDB
-		err, valueBlock := c.db.ReadFromDB("contract_handling", lastBlockKey)
-		if err != nil {
-			log.Fatalf("[%s] Failed to read LAST BLOCK from BoltDB: %v", nodeUrl, err)
-		}
-
-		var lastProcessedBlock int64
-		if valueBlock == "" {
-			lastProcessedBlock = c.initialBlock
-			log.Printf("[%s] No last block found in DB. Starting from the initial block: %d", nodeUrl, lastProcessedBlock)
-		} else {
-			lastProcessedBlock, err = strconv.ParseInt(valueBlock, 10, 64)
-			if err != nil {
-				log.Fatalf("[%s] Failed to convert last block to int64: %v", nodeUrl, err)
-			}
-		}
-
-		// Read the last index from BoltDB
-		err, valueIndex := c.db.ReadFromDB("contract_handling", nextIndexKey)
-		if err != nil {
-			log.Fatalf("[%s] Failed to read LAST INDEX from BoltDB: %v", nodeUrl, err)
-		}
-
-		var previousIndex int64
-		if valueIndex == "" {
-			previousIndex = 0
-		} else {
-			previousIndex, err = strconv.ParseInt(valueIndex, 10, 64)
-			if err != nil {
-				log.Fatalf("[%s] Failed to convert next_index to int64: %v", nodeUrl, err)
-			}
-		}
-
-		toBlock := fromBlock + c.blockStep
+		// Retrieve logs
 		keyed, err := ethClient.KeyedLogs(fromBlock, toBlock)
 		if err != nil {
 			log.Fatalf("[%s] Failed to get keyed logs: %v", nodeUrl, err)
 		}
-		log.Printf("[%s] Keyed logs: %d", nodeUrl, len(keyed))
 
-		// Unlock after reading and updating shared resources
-		c.mutex.Unlock()
+		// generate a name, with a mask just 4 last digits of node_url
+		nodeUrlMask := nodeUrl[len(nodeUrl)-4:]
+
+		log.Printf("[%s] Block range: %d-%d", nodeUrlMask, fromBlock, toBlock)
+		log.Printf("[%s] Keyed logs: %d", nodeUrlMask, len(keyed))
+
+		// Lock for critical section of reading and writing the lastIndex
+		c.mutex.Lock()
+
+		// Read the last index from BoltDB
+		err, valueIndex := c.db.ReadFromDB("contract_handling", "next_index")
+		if err != nil {
+			log.Fatalf("[%s] Failed to read NEXT INDEX from BoltDB: %v", nodeUrl, err)
+		}
+
+		var lastIndex int64
+		if valueIndex == "" {
+			lastIndex = 0
+		} else {
+			lastIndex, err = strconv.ParseInt(valueIndex, 10, 64)
+			if err != nil {
+				log.Fatalf("[%s] Failed to convert NEXT INDEX to int64: %v", nodeUrl, err)
+			}
+		}
 
 		// Process and write keyed logs
 		for i, k := range keyed {
@@ -161,39 +142,24 @@ func (c *Client) processClient(nodeUrl string, ethClient *ethereum.EthereumClien
 				log.Fatalf("[%s] Error marshalling struct to JSON: %v", nodeUrl, err)
 			}
 
-			// Lock for critical section of writing the keyed logs
-			c.mutex.Lock()
-
-			// Write each keyed log into the database with the correct index
-			indexKey := strconv.FormatInt(previousIndex+int64(i)+1, 10)
+			// Write keyed log with the correct index
+			indexKey := strconv.FormatInt(lastIndex+int64(i)+1, 10)
 			if err := c.db.WriteToDB("keyed_logs", indexKey, string(keyedJson)); err != nil {
 				log.Fatalf("[%s] Failed to write keyed log to BoltDB: %v", nodeUrl, err)
 			}
-
-			// Unlock after writing each keyed log
-			c.mutex.Unlock()
 		}
 
-		// Lock again for writing the last block and index values
-		c.mutex.Lock()
-
-		// Save updated block and index references
-		previousIndex += int64(len(keyed))
-		if err := c.db.WriteToDB("contract_handling", nextIndexKey, fmt.Sprintf("%d", previousIndex)); err != nil {
+		// Update last index and last block in BoltDB
+		lastIndex += int64(len(keyed))
+		if err := c.db.WriteToDB("contract_handling", "next_index", fmt.Sprintf("%d", lastIndex)); err != nil {
 			log.Fatalf("[%s] Failed to write next index to BoltDB: %v", nodeUrl, err)
 		}
-		if err := c.db.WriteToDB("contract_handling", lastBlockKey, fmt.Sprintf("%d", toBlock)); err != nil {
+		if err := c.db.WriteToDB("contract_handling", "last_block", fmt.Sprintf("%d", toBlock)); err != nil {
 			log.Fatalf("[%s] Failed to write last block to BoltDB: %v", nodeUrl, err)
 		}
 
-		log.Printf("[%s] Saved last block: %d", nodeUrl, toBlock)
-		log.Printf("[%s] Last Index: %d", nodeUrl, previousIndex)
-
-		// Unlock after writing the last block and index
+		// Unlock after writing
 		c.mutex.Unlock()
-
-		// Sleep before the next interval (customize as needed)
-		time.Sleep(5 * time.Second) // Example delay for next round
 	}
 }
 
