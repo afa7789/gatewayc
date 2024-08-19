@@ -8,6 +8,8 @@ This is a simple implementation of an indexer that indexes topic X of contract Y
 
 For the second challenge, check the branch "second".
 
+YOU HAVE TO HAVE A LIST OF NODES , as list_nodex.txt and those should be the URLS of them.
+
 ## Pre-Requisites & Installation
 
 - Go (Version: `go1.22.1`)

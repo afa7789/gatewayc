@@ -55,13 +55,12 @@ func main() {
 		log.Fatalf("Failed to read file: %v", err)
 	}
 	nodeList := strings.Split(string(nodeListFile), "\n")
-	nodeUrl := nodeList[0]
 
 	// Print Hello World and the ROCK_DB_HOST_PATH
 	log.Printf("BOLT_DB_PATH: %s\n", boltDBpath)
 	log.Printf("CONTRACT_ADDRESS: %s\n", contractAddress)
 	log.Printf("TOPIC_TO_FILTER: %s\n", topicToFilter)
-	log.Printf("NODE_URL: %s\n", nodeUrl)
+	// log.Printf("NODE_URL: %s\n", nodeUrl)
 	//
 	// Create a new client
 	initialBlockInt, err := strconv.ParseInt(initialBlock, 10, 64)
@@ -77,7 +76,7 @@ func main() {
 
 	c := client.NewClient(
 		boltDBpath,
-		nodeUrl,
+		nodeList,
 		contractAddress,
 		topicToFilter,
 		initialBlockInt,
